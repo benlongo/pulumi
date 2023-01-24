@@ -3,6 +3,7 @@ package filestate
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"os"
 	"path"
 	"path/filepath"
@@ -465,4 +466,28 @@ func TestHtmlEscaping(t *testing.T) {
 	assert.NoError(t, err)
 	state := string(bytes)
 	assert.Contains(t, state, "<html@tags>")
+}
+
+func TestLocalBackendRejectsStackInitOptions(t *testing.T) {
+	t.Parallel()
+
+	// • Create an empty struct to simulate a non-nil value.
+	type stackInitOptions struct{}
+	var opts = &stackInitOptions{}
+
+	// • Create a mock local backend
+	var tmpDir = t.TempDir()
+	var dirURI = fmt.Sprintf("file://%s", filepath.ToSlash(tmpDir))
+	var local, err = New(cmdutil.Diag(), dirURI)
+	assert.NoError(t, err)
+	var ctx = context.Background()
+
+	// • Simulate `pulumi stack init`, passing non-nil init options
+	fakeStackRef, err := local.ParseStackReference("foobar")
+	assert.NoError(t, err)
+	assert.Panics(t, func() {
+		// • Expect an error.
+		_, err := local.CreateStack(ctx, fakeStackRef, opts)
+		assert.NoError(t, err)
+	})
 }

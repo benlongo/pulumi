@@ -140,6 +140,8 @@ type Backend interface {
 	SupportsTags() bool
 	// SupportsOrganizations tells whether a user can belong to multiple organizations in this backend.
 	SupportsOrganizations() bool
+	// SupportsTeams tells whether a stack can have granular team permissions assigned to it.
+	SupportsTeams() bool
 
 	// ParseStackReference takes a string representation and parses it to a reference which may be used for other
 	// methods in this backend.

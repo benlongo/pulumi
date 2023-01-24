@@ -344,7 +344,9 @@ func (pc *Client) GetStack(ctx context.Context, stackID StackIdentifier) (apityp
 
 // CreateStack creates a stack with the given cloud and stack name in the scope of the indicated project.
 func (pc *Client) CreateStack(
-	ctx context.Context, stackID StackIdentifier, tags map[apitype.StackTagName]string) (apitype.Stack, error) {
+	ctx context.Context, stackID StackIdentifier,
+	tags map[apitype.StackTagName]string, teams []string,
+) (apitype.Stack, error) {
 	// Validate names and tags.
 	if err := validation.ValidateStackProperties(stackID.Stack, tags); err != nil {
 		return apitype.Stack{}, fmt.Errorf("validating stack properties: %w", err)
@@ -359,6 +361,7 @@ func (pc *Client) CreateStack(
 	createStackReq := apitype.CreateStackRequest{
 		StackName: stackID.Stack,
 		Tags:      tags,
+		Teams:     teams,
 	}
 
 	endpoint := fmt.Sprintf("/api/stacks/%s/%s", stackID.Owner, stackID.Project)

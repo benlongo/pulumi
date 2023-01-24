@@ -279,6 +279,10 @@ func (b *localBackend) SupportsOrganizations() bool {
 	return false
 }
 
+func (b *localBackend) SupportsTeams() bool {
+	return false
+}
+
 func (b *localBackend) ParseStackReference(stackRefName string) (backend.StackReference, error) {
 	if err := b.ValidateStackName(stackRefName); err != nil {
 		return nil, err
