@@ -1,4 +1,4 @@
-module github.com/pulumi/pulumi/tests/aliases/rename_component_and_child
+module github.com/pulumi/pulumi/tests/aliases/retype_remote_component_and_child
 
 go 1.18
 

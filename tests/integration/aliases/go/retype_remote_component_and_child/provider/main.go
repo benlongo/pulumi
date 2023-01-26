@@ -18,26 +18,75 @@ import (
 )
 
 type Bucket struct {
+	pulumi.CustomResourceState
+}
+
+func NewBucket(ctx *pulumi.Context, name string, opts ...pulumi.ResourceOption) (*Bucket, error) {
+	resource := &Bucket{}
+	err := ctx.RegisterResource(typeToken("Bucket"), name, nil, resource, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return resource, nil
+}
+
+type BucketComponent struct {
 	pulumi.ResourceState
 }
 
-type BucketV2 struct {
-	pulumi.ResourceState
-}
-
-type BucketArgs struct{}
-type BucketV2Args struct{}
-
-func NewBucket(ctx *pulumi.Context, name string, args *BucketArgs,
-	opts ...pulumi.ResourceOption) (*Bucket, error) {
-
-	component := &Bucket{}
-	err := ctx.RegisterComponentResource(providerName+":aws/s3:Bucket", name, component, opts...)
+func NewBucketComponent(ctx *pulumi.Context, name string, opts ...pulumi.ResourceOption) (*BucketComponent, error) {
+	component := &BucketComponent{}
+	err := ctx.RegisterComponentResource(typeToken("BucketComponent"), name, component, opts...)
 	if err != nil {
 		return nil, err
 	}
 
-	if err := ctx.RegisterResourceOutputs(component, pulumi.Map{}); err != nil {
+	_, err = NewBucket(ctx, name+"child", pulumi.Parent(component))
+	if err != nil {
+		return nil, err
+	}
+
+	return component, nil
+}
+
+type BucketV2 struct {
+	pulumi.CustomResourceState
+}
+
+func NewBucketV2(ctx *pulumi.Context, name string, opts ...pulumi.ResourceOption) (*BucketV2, error) {
+	resource := &BucketV2{}
+	aliases := pulumi.Aliases([]pulumi.Alias{
+		{
+			Type: pulumi.String(typeToken("Bucket")),
+		},
+	})
+	opts = append(opts, aliases)
+	err := ctx.RegisterResource(typeToken("BucketV2"), name, nil, resource, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return resource, nil
+}
+
+type BucketComponentV2 struct {
+	pulumi.ResourceState
+}
+
+func NewBucketComponentV2(ctx *pulumi.Context, name string, opts ...pulumi.ResourceOption) (*BucketComponentV2, error) {
+	component := &BucketComponentV2{}
+	aliases := pulumi.Aliases([]pulumi.Alias{
+		{
+			Type: pulumi.String(typeToken("BucketComponent")),
+		},
+	})
+	opts = append(opts, aliases)
+	err := ctx.RegisterComponentResource(typeToken("BucketComponentV2"), name, component, opts...)
+	if err != nil {
+		return nil, err
+	}
+
+	_, err = NewBucketV2(ctx, name+"child", pulumi.Parent(component))
+	if err != nil {
 		return nil, err
 	}
 
@@ -46,6 +95,10 @@ func NewBucket(ctx *pulumi.Context, name string, args *BucketArgs,
 
 const providerName = "wibble"
 const version = "0.0.1"
+
+func typeToken(t string) string {
+	return fmt.Sprintf("%s:index:%s", providerName, t)
+}
 
 var currentID int
 
@@ -64,8 +117,6 @@ type Provider struct {
 	host    *provider.HostClient
 	name    string
 	version string
-
-	expectResourceArg bool
 }
 
 func makeProvider(host *provider.HostClient, name, version string) (pulumirpc.ResourceProviderServer, error) {
@@ -76,8 +127,7 @@ func makeProvider(host *provider.HostClient, name, version string) (pulumirpc.Re
 	}, nil
 }
 
-func (p *Provider) Create(ctx context.Context,
-	req *pulumirpc.CreateRequest) (*pulumirpc.CreateResponse, error) {
+func (p *Provider) Create(ctx context.Context, req *pulumirpc.CreateRequest) (*pulumirpc.CreateResponse, error) {
 	id := currentID
 	currentID++
 
@@ -91,31 +141,16 @@ func (p *Provider) Construct(ctx context.Context,
 	return pulumiprovider.Construct(ctx, req, p.host.EngineConn(), func(ctx *pulumi.Context, typ, name string,
 		inputs pulumiprovider.ConstructInputs, options pulumi.ResourceOption) (*pulumiprovider.ConstructResult, error) {
 
-		allowedTypes := []string{
-			providerName + ":aws/s3:Bucket",
-			providerName + ":aws/s3:BucketV2",
-			providerName + ":index:Bucket",
-			providerName + ":index:BucketV2",
+		var component pulumi.ComponentResource
+		var err error
+		switch typ {
+		case typeToken("BucketComponent"):
+			component, err = NewBucketComponent(ctx, name, options)
+		case typeToken("BucketComponentV2"):
+			component, err = NewBucketComponentV2(ctx, name, options)
+		default:
+			err = fmt.Errorf("unknown resource type %s", req.GetType())
 		}
-
-		isAllowd := false
-		for _, allowdType := range allowedTypes {
-			if allowdType == typ {
-				isAllowd = true
-				break
-			}
-		}
-
-		if !isAllowd {
-			return nil, fmt.Errorf("unknown resource type %s", typ)
-		}
-
-		args := &BucketArgs{}
-		if err := inputs.CopyTo(args); err != nil {
-			return nil, fmt.Errorf("setting args: %w", err)
-		}
-
-		component, err := NewBucket(ctx, name, args, options)
 		if err != nil {
 			return nil, fmt.Errorf("creating component: %w", err)
 		}
@@ -136,9 +171,6 @@ func (p *Provider) DiffConfig(ctx context.Context,
 
 func (p *Provider) Configure(ctx context.Context,
 	req *pulumirpc.ConfigureRequest) (*pulumirpc.ConfigureResponse, error) {
-	if _, ok := req.GetArgs().Fields["expectResourceArg"]; ok {
-		p.expectResourceArg = true
-	}
 	return &pulumirpc.ConfigureResponse{
 		AcceptSecrets:   true,
 		SupportsPreview: true,
