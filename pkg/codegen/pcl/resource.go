@@ -43,6 +43,8 @@ type ResourceOptions struct {
 	Version model.Expression
 	// The plugin download URL for this resource.
 	PluginDownloadURL model.Expression
+	// The resource whose deletion will cause the deletion of this resource.
+	DeletedWith model.Expression
 }
 
 // Resource represents a resource instantiation inside of a program or component.
